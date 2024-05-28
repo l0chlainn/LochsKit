@@ -81,6 +81,10 @@ function Signal:fire(...)
 end
 
 function Signal:connect(handler)
+    if typeof(handler) ~= "function" then
+        error("handler must be a function!", 2)
+    end
+
     local connection = Connection.new(handler)
     table.insert(self._regularConnections, connection)
 
@@ -88,6 +92,10 @@ function Signal:connect(handler)
 end
 
 function Signal:once(handler)
+    if typeof(handler) ~= "function" then
+        error("handler must be a function!", 2)
+    end
+
     local connection = Connection.new(handler)
     table.insert(self._onceConnections, connection)
 
