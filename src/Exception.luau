@@ -1,6 +1,5 @@
 --[[ Exception Class ]]--
 local Exception = {}
-Exception.__type = "Exception"
 Exception.__index = Exception
 Exception.__tostring = function(exception)
     return `Exception: {exception.code}, Reason: {exception.reason}`
@@ -13,14 +12,10 @@ function Exception.new(code, reason)
         error("reason must be a string!", 2)
     end
 
-    -- construct an instance of Exception
-    local self = {
+    return setmetatable({
         code = code,
         reason = reason,
-    }
-    setmetatable(self, Exception)
-
-    return self
+    }, Exception)
 end
 
 return Exception

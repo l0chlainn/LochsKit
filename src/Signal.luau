@@ -27,14 +27,10 @@ function Connection.new(handler)
         error("handler must be a function!", 2)
     end
 
-    -- construct an instance of Connection
-    local self = {
+    return setmetatable({
         connected = true,
         handler = handler,
-    }
-    setmetatable(self, Connection)
-
-    return self
+    }, Connection)
 end
 
 function Connection:disconnect()
@@ -46,14 +42,10 @@ local Signal = {}
 Signal.__index = Signal
 
 function Signal.new()
-    -- construct an instance of Signal
-    local self = {
+    return setmetatable({
         _regularConnections = {},
         _onceConnections = {},
-    }
-    setmetatable(self, Signal)
-
-    return self
+    }, Signal)
 end
 
 function Signal:destroy()

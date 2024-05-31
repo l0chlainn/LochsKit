@@ -16,15 +16,11 @@ StateMachine.__index = StateMachine
 StateMachine.Exceptions = Exceptions
 
 function StateMachine.new()
-    -- construct an instance of StateMachine
-    local self = {
+    return setmetatable({
         currentState = "initial",
         _states = {},
         _transitions = {},
-    }
-    setmetatable(self, StateMachine)
-
-    return self
+    }, StateMachine)
 end
 
 function StateMachine:addState(name, enterHandler, exitHandler)
@@ -65,9 +61,8 @@ function StateMachine:canTriggerTransition(name)
     local transition = self._transition[name]
     if transition and table.find(transition.fromStates, self.currentState) then
         return true
-    else
-        return false
     end
+    return false
 end
 
 function StateMachine:triggerTransition(name)
