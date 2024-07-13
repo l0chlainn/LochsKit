@@ -1,32 +1,38 @@
-local availableThread = nil
+local idleThread = nil
 
--- aquire current thread so it's clear it's in use
--- and return the thread when finished
-local function aquireThreadAndExecuteHandler(handler, ...)
-    local aquiredThread = availableThread
-    availableThread = nil
+-- we use a seperate function here to make unpacking
+-- the results of coroutine.yield() a little easier
+-- and we take control of the idle thread so that
+-- it's clear that it's currently in use.
+local function aquireIdleThreadAndRunHandler(handler, ...)
+    local runningThread = idleThread
+    runningThread = nil
     handler(...)
-    availableThread = aquiredThread
+    idleThread = runningThread
 end
 
 -- persistant coroutines are faster than making a new one,
--- so we use a loop to keep the thread active and ready to
--- execute again
-local function persistantHandlerExecutorThread()
+-- so we use a loop to keep the thread active and available.
+local function idleThreadLoop()
     while true do
-        aquireThreadAndExecuteHandler(coroutine.yield())
+        aquireIdleThreadAndRunHandler(coroutine.yield())
     end
 end
 
---[[ Connection Class ]]--
+-- run the handler in a seperate thread so we can handle
+-- yielding in the handler.
+local function runHandlerInSeperateThread(handler, ...)
+    if not idleThread then
+        idleThread = task.spawn(idleThreadLoop)
+    end
+    task.spawn(idleThread, handler, ...)
+end
+
+--[ Connection Class ]--
 local Connection = {}
 Connection.__index = Connection
 
 function Connection.new(handler)
-    if typeof(handler) ~= "function" then
-        error("handler must be a function!", 2)
-    end
-
     return setmetatable({
         connected = true,
         handler = handler,
@@ -37,7 +43,7 @@ function Connection:disconnect()
     self.connected = false
 end
 
---[[ Signal Class ]]--
+--[ Signal Class ]--
 local Signal = {}
 Signal.__index = Signal
 
@@ -54,12 +60,9 @@ function Signal:destroy()
 end
 
 function Signal:fire(...)
-    -- execute regular connections
     local regularConnections = self._regularConnections
     local keptIndex = 1
     for loopIndex, connection in regularConnections do
-        -- if the connection is connected, execute the handler
-        -- else remove from the list
         if connection.connected then
             -- if a previous connection was removed, the index
             -- will mismatch and so we shift the list down
@@ -69,27 +72,18 @@ function Signal:fire(...)
             end
             keptIndex += 1
 
-            if not availableThread then
-                availableThread = task.spawn(persistantHandlerExecutorThread)
-            end
-            task.spawn(availableThread, connection.handler, ...)
+            runHandlerInSeperateThread(connection.handler, ...)
         else
             regularConnections[loopIndex] = nil
         end
     end
 
-    -- execute once connections
     local onceConnections = self._onceConnections
-    for loopIndex, connection in onceConnections do
-        -- if the connection is connected, execute the handler
-        -- regardless, remove from the list
+    for index, connection in onceConnections do
         if connection.connected then
-            if not availableThread then
-                availableThread = task.spawn(persistantHandlerExecutorThread)
-            end
-            task.spawn(availableThread, connection.handler, ...)
+            runHandlerInSeperateThread(connection.handler, ...)
         end
-        onceConnections[loopIndex] = nil
+        onceConnections[index] = nil
     end
 end
 

@@ -1,11 +1,6 @@
-local CustomEnum = require(script.CustomEnum)
-local Exception = require(script.Exception)
-local Signal = require(script.Exception)
-local StateMachine = require(script.StateMachine)
-
+--[ LochsKit API ]--
 return {
-    CustomEnum = CustomEnum,
-    Exception = Exception,
-    Signal = Signal,
-    StateMachine = StateMachine,
+    Enumeration = require(script:FindFirstChild("Enumeration")),
+    Exception = require(script:FindFirstChild("Exception")),
+    Signal = require(script:FindFirstChild("Signal")),
 }
