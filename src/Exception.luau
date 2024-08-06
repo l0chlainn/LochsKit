@@ -7,12 +7,12 @@ end
 
 function Exception.new(code, reason)
     if
-        typeof(code) ~= "number"
+        type(code) ~= "number"
         or code < 0
         or code % 1 ~= 0
     then
-        error("code must be an unsigned integer!", 2)
-    elseif typeof(reason) ~= "string" then
+        error("code must be a positive integer!", 2)
+    elseif type(reason) ~= "string" then
         error("reason must be a string!", 2)
     end
 

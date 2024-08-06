@@ -1,7 +1,7 @@
 local idleThread = nil
 
 -- we use a seperate function here to make unpacking
--- the results of coroutine.yield() a little easier
+-- the results of coroutine.yield a little easier
 -- and we take control of the idle thread so that
 -- it's clear that it's currently in use.
 local function aquireIdleThreadAndRunHandler(handler, ...)
@@ -88,7 +88,7 @@ function Signal:fire(...)
 end
 
 function Signal:connect(handler)
-    if typeof(handler) ~= "function" then
+    if type(handler) ~= "function" then
         error("handler must be a function!", 2)
     end
 
@@ -99,7 +99,7 @@ function Signal:connect(handler)
 end
 
 function Signal:once(handler)
-    if typeof(handler) ~= "function" then
+    if type(handler) ~= "function" then
         error("handler must be a function!", 2)
     end
 
