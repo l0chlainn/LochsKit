@@ -13,7 +13,7 @@ export type Exception = typeof(setmetatable({} :: {
 }, {} :: ExceptionClass))
 
 --[ Exception Class ]--
-local Exception = {}
+local Exception = {} :: ExceptionClass
 Exception.__index = Exception
 Exception.__tostring = function(exception: Exception): string
     return `Error: '{exception.id}', Reason: '{exception.message}'`

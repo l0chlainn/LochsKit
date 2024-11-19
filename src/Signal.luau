@@ -40,7 +40,7 @@ local function persistentRunnerThread(): ()
 end
 
 --[ Signal Class ]--
-local Signal = {}
+local Signal = {} :: SignalClass
 Signal.__index = Signal
 
 function Signal.is(value: any): boolean

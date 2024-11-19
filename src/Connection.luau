@@ -25,7 +25,7 @@ export type Connection = typeof(setmetatable({} :: {
 }, {} :: ConnectionClass))
 
 --[ Connection Class ]--
-local Connection = {}
+local Connection = {} :: ConnectionClass
 Connection.__index = Connection
 
 function Connection.is(value: any): boolean
