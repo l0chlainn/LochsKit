@@ -1,24 +1,38 @@
+--!strict
+
+type ExceptionClass = {
+    __index: ExceptionClass,
+    __tostring: (exception: Exception) -> string,
+
+    is: (value: any) -> boolean,
+    new: (id: string, message: string) -> Exception,
+}
+export type Exception = typeof(setmetatable({} :: {
+    id: string,
+    message: string,
+}, {} :: ExceptionClass))
+
 --[ Exception Class ]--
 local Exception = {}
 Exception.__index = Exception
-Exception.__tostring = function(exception)
-    return `Error: '{exception.code}', Reason: '{exception.reason}'`
+Exception.__tostring = function(exception: Exception): string
+    return `Error: '{exception.id}', Reason: '{exception.message}'`
 end
 
-function Exception.new(code, reason)
-    if
-        type(code) ~= "number"
-        or code < 0
-        or code % 1 ~= 0
-    then
-        error("code must be a positive integer!", 2)
-    elseif type(reason) ~= "string" then
-        error("reason must be a string!", 2)
+function Exception.is(value: any): boolean
+    return type(value) == "table" and getmetatable(value) == Exception
+end
+
+function Exception.new(id: string, message: string): Exception
+    if type(id) ~= "number" then
+        error("id must be a number!", 2)
+    elseif type(message) ~= "string" then
+        error("message must be a string!", 2)
     end
 
     return setmetatable({
-        code = code,
-        reason = reason,
+        id = id,
+        message = message,
     }, Exception)
 end
 

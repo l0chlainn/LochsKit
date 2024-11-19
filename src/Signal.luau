@@ -1,112 +1,133 @@
-local idleThread = nil
+--!strict
 
--- we use a seperate function here to make unpacking
--- the results of coroutine.yield a little easier
--- and we take control of the idle thread so that
--- it's clear that it's currently in use.
-local function aquireIdleThreadAndRunHandler(handler, ...)
-    local runningThread = idleThread
-    runningThread = nil
-    handler(...)
-    idleThread = runningThread
+local LochsKit = script.Parent
+local Connection = require(LochsKit:FindFirstChild("Connection"))
+
+type Connection = Connection.Connection
+
+type callback = (...any) -> ()
+
+type SignalClass = {
+    __index: SignalClass,
+
+    is: (value: any) -> boolean,
+    new: () -> Signal,
+
+    destroy: (self: Signal) -> (),
+    _link: (self: Signal, connection: Connection) -> (),
+    _unlink: (self: Signal, connection: Connection) -> (),
+    trigger: (self: Signal, ...any) -> (),
+    connect: (self: Signal, eventCallback: callback) -> Connection,
+    disconnectAll: (self: Signal) -> (),
+}
+export type Signal = typeof(setmetatable({} :: {
+    _connectionsListHead: Connection?,
+}, {} :: SignalClass))
+
+local idleRunnerThread: thread? = nil
+
+local function acquireRunnerThreadAndRunCallback(callback: callback, ...: any): ()
+    local acquiredRunnerThread = idleRunnerThread :: thread
+    idleRunnerThread = nil
+    callback(...)
+    idleRunnerThread = acquiredRunnerThread
 end
 
--- persistant coroutines are faster than making a new one,
--- so we use a loop to keep the thread active and available.
-local function idleThreadLoop()
+local function persistentRunnerThread(): ()
     while true do
-        aquireIdleThreadAndRunHandler(coroutine.yield())
+        acquireRunnerThreadAndRunCallback(coroutine.yield())
     end
-end
-
--- run the handler in a seperate thread so we can handle
--- yielding in the handler.
-local function runHandlerInSeperateThread(handler, ...)
-    if not idleThread then
-        idleThread = task.spawn(idleThreadLoop)
-    end
-    task.spawn(idleThread, handler, ...)
-end
-
---[ Connection Class ]--
-local Connection = {}
-Connection.__index = Connection
-
-function Connection.new(handler)
-    return setmetatable({
-        connected = true,
-        handler = handler,
-    }, Connection)
-end
-
-function Connection:disconnect()
-    self.connected = false
 end
 
 --[ Signal Class ]--
 local Signal = {}
 Signal.__index = Signal
 
-function Signal.new()
+function Signal.is(value: any): boolean
+    return type(value) == "table" and getmetatable(value) == Signal
+end
+
+function Signal.new(): Signal
     return setmetatable({
-        _regularConnections = {},
-        _onceConnections = {},
+        _connectionsListHead = nil,
     }, Signal)
 end
 
-function Signal:destroy()
-    table.clear(self._regularConnections)
-    table.clear(self._onceConnections)
-end
-
-function Signal:fire(...)
-    local regularConnections = self._regularConnections
-    local keptIndex = 1
-    for loopIndex, connection in regularConnections do
-        if connection.connected then
-            -- if a previous connection was removed, the index
-            -- will mismatch and so we shift the list down
-            if loopIndex ~= keptIndex then
-                regularConnections[keptIndex] = connection
-                regularConnections[loopIndex] = nil
-            end
-            keptIndex += 1
-
-            runHandlerInSeperateThread(connection.handler, ...)
-        else
-            regularConnections[loopIndex] = nil
-        end
+function Signal.destroy(self: Signal): ()
+    if not Signal.is(self) then
+        error("self must be a Signal!", 2)
     end
 
-    local onceConnections = self._onceConnections
-    for index, connection in onceConnections do
-        if connection.connected then
-            runHandlerInSeperateThread(connection.handler, ...)
-        end
-        onceConnections[index] = nil
+    self:disconnectAll()
+end
+
+function Signal._link(self: Signal, connection: Connection): ()
+    local headConnection = self._connectionsListHead
+    if headConnection then
+        connection._nextConnection = headConnection
+        headConnection._previousConnection = connection
+    end
+    self._connectionsListHead = connection
+end
+
+function Signal._unlink(self: Signal, connection: Connection): ()
+    local nextConnection = connection._nextConnection
+    local previousConnection = connection._previousConnection
+    if nextConnection then
+        nextConnection._previousConnection = previousConnection
+    end
+    if previousConnection then
+        previousConnection._nextConnection = nextConnection
+    else
+        self._connectionsListHead = nextConnection
     end
 end
 
-function Signal:connect(handler)
-    if type(handler) ~= "function" then
-        error("handler must be a function!", 2)
+function Signal.trigger(self: Signal, ...: any): ()
+    if not Signal.is(self) then
+        error("self must be a Signal!", 2)
     end
 
-    local connection = Connection.new(handler)
-    table.insert(self._regularConnections, connection)
+    local connection = self._connectionsListHead
+    while connection do
+        if not idleRunnerThread then
+            idleRunnerThread = task.spawn(persistentRunnerThread)
+        end
+        task.spawn(
+            idleRunnerThread :: thread,
+            connection._eventCallback,
+            ...
+        )
+        connection = connection._nextConnection
+    end
+end
+
+function Signal.connect(self: Signal, callback: callback): Connection
+    if not Signal.is(self) then
+        error("self must be a Signal!", 2)
+    elseif type(callback) ~= "function" then
+        error("callback must be a function!", 2)
+    end
+
+    local connection
+    connection = Connection.new(callback, function()
+        self:_unlink(connection)
+    end)
+    self:_link(connection)
 
     return connection
 end
 
-function Signal:once(handler)
-    if type(handler) ~= "function" then
-        error("handler must be a function!", 2)
+function Signal.disconnectAll(self: Signal): ()
+    if not Signal.is(self) then
+        error("self must be a Signal!", 2)
     end
 
-    local connection = Connection.new(handler)
-    table.insert(self._onceConnections, connection)
-
-    return connection
+    local connection = self._connectionsListHead
+    while connection do
+        connection:disconnect()
+        connection = connection._nextConnection
+    end
 end
 
 return Signal
