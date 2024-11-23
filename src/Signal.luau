@@ -13,9 +13,9 @@ type SignalClass = {
     is: (value: any) -> boolean,
     new: () -> Signal,
 
-    destroy: (self: Signal) -> (),
     _link: (self: Signal, connection: Connection) -> (),
     _unlink: (self: Signal, connection: Connection) -> (),
+
     trigger: (self: Signal, ...any) -> (),
     connect: (self: Signal, eventCallback: callback) -> Connection,
     disconnectAll: (self: Signal) -> (),
@@ -51,14 +51,6 @@ function Signal.new(): Signal
     return setmetatable({
         _connectionsListHead = nil,
     }, Signal)
-end
-
-function Signal.destroy(self: Signal): ()
-    if not Signal.is(self) then
-        error("self must be a Signal!", 2)
-    end
-
-    self:disconnectAll()
 end
 
 function Signal._link(self: Signal, connection: Connection): ()
