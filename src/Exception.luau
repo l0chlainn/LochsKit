@@ -25,9 +25,9 @@ end
 
 function Exception.new(id: string, message: string): Exception
     if type(id) ~= "number" then
-        error("id must be a number!", 2)
+        error(`expected number for id, got '{typeof(id)}'`, 2)
     elseif type(message) ~= "string" then
-        error("message must be a string!", 2)
+        error(`expected string for message, got '{typeof(message)}'`, 2)
     end
 
     return setmetatable({

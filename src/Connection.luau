@@ -7,10 +7,7 @@ type ConnectionClass = {
     __index: ConnectionClass,
 
     is: (value: any) -> boolean,
-    new: (
-        eventCallback: eventCallback,
-        disconnectCallback: disconnectCallback
-    ) -> Connection,
+    new: (eventCallback: eventCallback, disconnectCallback: disconnectCallback) -> Connection,
 
     disconnect: (self: Connection) -> (),
 }
@@ -34,9 +31,9 @@ end
 
 function Connection.new(eventCallback: eventCallback, disconnectCallback: disconnectCallback): Connection
     if type(eventCallback) ~= "function" then
-        error("eventCallback must be a function!", 2)
+        error(`expected function for eventCallback, got '{typeof(eventCallback)}'`, 2)
     elseif type(disconnectCallback) ~= "function" then
-        error("disconnectCallback must be a function!", 2)
+        error(`expected function for disconnectCallback, got '{typeof(disconnectCallback)}'`, 2)
     end
 
     return setmetatable({
@@ -52,7 +49,7 @@ end
 
 function Connection.disconnect(self: Connection): ()
     if not Connection.is(self) then
-        error("self must be a Connection!", 2)
+        error(`expected Connection for self, got '{typeof(self)}'`, 2)
     end
 
     if not self.isConnected then

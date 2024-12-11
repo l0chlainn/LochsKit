@@ -1,6 +1,7 @@
 --!strict
 
 local LochsKit = script.Parent
+
 local Connection = require(LochsKit:FindFirstChild("Connection"))
 
 type Connection = Connection.Connection
@@ -17,7 +18,7 @@ type SignalClass = {
     _unlink: (self: Signal, connection: Connection) -> (),
 
     trigger: (self: Signal, ...any) -> (),
-    connect: (self: Signal, eventCallback: callback) -> Connection,
+    connect: (self: Signal, callback: callback) -> Connection,
     disconnectAll: (self: Signal) -> (),
 }
 export type Signal = typeof(setmetatable({} :: {
@@ -77,7 +78,7 @@ end
 
 function Signal.trigger(self: Signal, ...: any): ()
     if not Signal.is(self) then
-        error("self must be a Signal!", 2)
+        error(`expected Signal for self, got '{typeof(self)}'`, 2)
     end
 
     local connection = self._connectionsListHead
@@ -96,9 +97,9 @@ end
 
 function Signal.connect(self: Signal, callback: callback): Connection
     if not Signal.is(self) then
-        error("self must be a Signal!", 2)
+        error(`expected Signal for self, got '{typeof(self)}'`, 2)
     elseif type(callback) ~= "function" then
-        error("callback must be a function!", 2)
+        error(`expected function for callback, got '{typeof(callback)}'`, 2)
     end
 
     local connection
@@ -112,7 +113,7 @@ end
 
 function Signal.disconnectAll(self: Signal): ()
     if not Signal.is(self) then
-        error("self must be a Signal!", 2)
+        error(`expected Signal for self, got '{typeof(self)}'`, 2)
     end
 
     local connection = self._connectionsListHead
