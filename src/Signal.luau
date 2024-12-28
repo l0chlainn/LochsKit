@@ -88,7 +88,7 @@ function Signal.trigger(self: Signal, ...: any): ()
         end
         task.spawn(
             idleRunnerThread :: thread,
-            connection._eventCallback,
+            connection._callback,
             ...
         )
         connection = connection._nextConnection
