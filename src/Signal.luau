@@ -25,21 +25,6 @@ export type Signal = typeof(setmetatable({} :: {
     _connectionsListHead: Connection?,
 }, {} :: SignalClass))
 
-local idleRunnerThread: thread? = nil
-
-local function acquireRunnerThreadAndRunCallback(callback: callback, ...: any): ()
-    local acquiredRunnerThread = idleRunnerThread :: thread
-    idleRunnerThread = nil
-    callback(...)
-    idleRunnerThread = acquiredRunnerThread
-end
-
-local function persistentRunnerThread(): ()
-    while true do
-        acquireRunnerThreadAndRunCallback(coroutine.yield())
-    end
-end
-
 --[ Signal Class ]--
 local Signal = {} :: SignalClass
 Signal.__index = Signal
@@ -83,14 +68,7 @@ function Signal.trigger(self: Signal, ...: any): ()
 
     local connection = self._connectionsListHead
     while connection do
-        if not idleRunnerThread then
-            idleRunnerThread = task.spawn(persistentRunnerThread)
-        end
-        task.spawn(
-            idleRunnerThread :: thread,
-            connection._callback,
-            ...
-        )
+        connection:call(...)
         connection = connection._nextConnection
     end
 end
