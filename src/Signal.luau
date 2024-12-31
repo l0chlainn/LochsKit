@@ -1,7 +1,6 @@
 --!strict
 
 local LochsKit = script.Parent
-
 local Connection = require(LochsKit:FindFirstChild("Connection"))
 
 type Connection = Connection.Connection

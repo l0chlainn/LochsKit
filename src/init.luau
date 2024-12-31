@@ -1,8 +1,15 @@
 --!strict
 
+local Automaton = require(script:FindFirstChild("Automaton"))
+local Connection = require(script:FindFirstChild("Connection"))
 local Exception = require(script:FindFirstChild("Exception"))
 local Signal = require(script:FindFirstChild("Signal"))
-local Connection = require(script:FindFirstChild("Connection"))
+
+type AutomatonClass = typeof(Automaton)
+export type Automaton = Automaton.Automaton
+
+type ConnectionClass = typeof(Connection)
+export type Connection = Connection.Connection
 
 type ExceptionClass = typeof(Exception)
 export type Exception = Exception.Exception
@@ -10,17 +17,16 @@ export type Exception = Exception.Exception
 type SignalClass = typeof(Signal)
 export type Signal = Signal.Signal
 
-type ConnectionClass = typeof(Connection)
-export type Connection = Connection.Connection
-
 type LochsKitLibrary = {
+    Automaton: AutomatonClass,
+    Connection: ConnectionClass,
     Exception: ExceptionClass,
     Signal: SignalClass,
-    Connection: ConnectionClass,
 }
 
 --[ LochsKit Library ]--
 local LochsKit: LochsKitLibrary = {
+    Automaton = Automaton,
     Exception = Exception,
     Signal = Signal,
     Connection = Connection,
