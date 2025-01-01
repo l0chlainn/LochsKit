@@ -7,7 +7,6 @@ type Signal = Signal.Signal
 
 type action = (...any) -> ...any
 type condition = () -> ()
-
 type state = {
     name: string,
     actionMap: {[string]: action},
@@ -23,19 +22,12 @@ type AutomatonClass = {
     __index: AutomatonClass,
 
     is: (value: any) -> boolean,
-    new: () -> Automaton,
+    new: (
+        initial: string,
+        states: {state},
+        transitions: {transition}
+    ) -> Automaton,
 
-    addState: (
-        self: Automaton,
-        name: string,
-        actionMap: {[string]: action}
-    ) -> (),
-    addTransition: (
-        self: Automaton,
-        event: string,
-        toState: string,
-        fromStates: {string}
-    ) -> (),
     changeState: (self: Automaton, name: string) -> (),
     triggerEvent: (self: Automaton, event: string, ...any) -> (),
     executeAction: (self: Automaton, name: string, ...any) -> ...any,
@@ -52,79 +44,89 @@ export type Automaton = typeof(setmetatable({} :: {
 local Automaton = {} :: AutomatonClass
 Automaton.__index = Automaton
 
-function Automaton.new(): Automaton
+function Automaton.new(
+    initial: string,
+    states: {state},
+    transitions: {transition}
+): Automaton
+    if type(initial) ~= "string" then
+        error(`expected string for initial, got '{typeof(initial)}'`, 2)
+    elseif type(states) ~= "table" then
+        error(`expected table for states, got '{typeof(states)}'`, 2)
+    elseif type(transitions) ~= "table" then
+        error(`expected table for transitions, got '{typeof(transitions)}'`, 2)
+    end
+
+    local stateMap = {}
+    for i, state in ipairs(states) do
+        if type(state) ~= "table" then
+            error(`expected table for states[{i}], got '{typeof(state)}'`, 2)
+        end
+
+        local name = state.name
+        local actionMap = state.actionMap
+        if type(name) ~= "string" then
+            error(`expected string for states[{i}].name, got '{typeof(name)}'`, 2)
+        elseif type(actionMap) ~= "table" then
+            error(`expected table for states[{i}].actionMap, got '{typeof(actionMap)}'`, 2)
+        end
+
+        for j, action in pairs(actionMap) do
+            if type(j) ~= "string" then
+                error(`expected string for states[{i}].actionMap key, got '{typeof(j)}'`, 2)
+            elseif type(action) ~= "function" then
+                error(`expected function for states[{i}].actionMap[{j}], got '{typeof(action)}'`, 2)
+            end
+        end
+
+        stateMap[name] = state
+    end
+
+    local eventListenersMap = {}
+    for i, transition in ipairs(transitions) do
+        if type(transition) ~= "table" then
+            error(`expected table for transitions[{i}], got '{typeof(transition)}'`, 2)
+        end
+
+        local event = transition.event
+        local toState = transition.toState
+        local fromStates = transition.fromStates
+        local condition = transition.condition
+        if type(event) ~= "string" then
+            error(`expected string for transitions[{i}].event, got '{typeof(event)}'`, 2)
+        elseif type(toState) ~= "string" then
+            error(`expected string for transitions[{i}].toState, got '{typeof(toState)}'`, 2)
+        elseif type(fromStates) ~= "table" then
+            error(`expected table for transitions[{i}].fromStates, got '{typeof(fromStates)}'`, 2)
+        elseif condition ~= nil and type(condition) ~= "function" then
+            error(`expected function for transitions[{i}].condition, got '{typeof(condition)}'`, 2)
+        end
+
+        for j, fromState in ipairs(fromStates) do
+            if type(fromState) ~= "string" then
+                error(`expected string for transitions[{i}].fromStates[{j}], got '{typeof(fromState)}'`, 2)
+            end
+        end
+
+        local eventListeners = eventListenersMap[event]
+        if eventListeners then
+            table.insert(eventListeners, transition)
+        else
+            eventListenersMap[event] = {transition}
+        end
+    end
+
+    if not stateMap[initial] then
+        error(`initial '{initial}' does map to a state!`)
+    end
+
     return setmetatable({
-        state = "",
-        _stateMap = {},
-        _eventListenersMap = {},
+        state = initial,
+        _stateMap = stateMap,
+        _eventListenersMap = eventListenersMap,
 
         stateChanged = Signal.new(),
     }, Automaton)
-end
-
-function Automaton.addState(
-    self: Automaton,
-    name: string,
-    actionMap: {[string]: action}
-): ()
-    if not Automaton.is(self) then
-        error(`expected Automaton for self, got '{typeof(self)}'`, 2)
-    elseif type(name) ~= "string" then
-        error(`expected string for self, got '{typeof(name)}'`, 2)
-    elseif type(actionMap) ~= "table" then
-        error(`expected table for self, got '{typeof(actionMap)}'`, 2)
-    end
-
-    for key, action in actionMap do
-        if type(key) ~= "string" then
-            error(`expected string for actionMap key, got '{typeof(key)}'`, 2)
-        elseif type(action) ~= "function" then
-            error(`expected function for actionMap[{key}], got '{typeof(action)}'`, 2)
-        end
-    end
-
-    self._stateMap[name] = {
-        name = name,
-        actionMap = actionMap,
-    }
-end
-
-function Automaton.addTransition(
-    self: Automaton,
-    event: string,
-    toState: string,
-    fromStates: {string}
-): ()
-    if not Automaton.is(self) then
-        error(`expected Automaton for self, got '{typeof(self)}'`, 2)
-    elseif type(event) ~= "string" then
-        error(`expected string for event, got '{typeof(event)}'`, 2)
-    elseif type(toState) ~= "string" then
-        error(`expected string for toState, got '{typeof(toState)}'`, 2)
-    elseif type(fromStates) ~= "table" then
-        error(`expected table for fromStates, got '{typeof(fromStates)}'`, 2)
-    end
-
-    for index, fromState in fromStates do
-        if type(index) ~= "number" then
-            error(`expected number for index in fromStates, got '{typeof(index)}'`, 2)
-        elseif type(fromState) ~= "string" then
-            error(`expected string for fromStates[{index}], got '{typeof(fromState)}'`, 2)
-        end
-    end
-
-    local transition = {
-        event = event,
-        toState = toState,
-        fromStates = fromStates,
-    }
-    local eventListenersMap = self._eventListenersMap
-    local eventListeners = eventListenersMap[event]
-    if eventListeners then
-        table.insert(eventListeners, transition)
-    else
-        eventListenersMap[event] = {transition}
-    end
 end
 
 function Automaton.changeState(self: Automaton, name: string): ()
