@@ -1,9 +1,10 @@
 # Project place file
 /LochsKit.rbxlx
 
-# Roblox Studio lock files
+# Roblox Studio files
 /*.rbxlx.lock
 /*.rbxl.lock
+/*.rbxl
 
 # Selene files
 sourcemap.json

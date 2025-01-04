@@ -44,6 +44,10 @@ export type Automaton = typeof(setmetatable({} :: {
 local Automaton = {} :: AutomatonClass
 Automaton.__index = Automaton
 
+function Automaton.is(value: any): boolean
+    return type(value) == "table" and getmetatable(value) == Automaton
+end
+
 function Automaton.new(
     initial: string,
     states: {state},
