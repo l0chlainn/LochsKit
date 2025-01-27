@@ -6,7 +6,7 @@ local Signal = require(LochsKit:FindFirstChild("Signal"))
 type Signal = Signal.Signal
 
 type action = (...any) -> ...any
-type condition = () -> ()
+type condition = (...any) -> boolean
 type state = {
     name: string,
     actionMap: {[string]: action},
@@ -28,14 +28,14 @@ type AutomatonClass = {
         transitions: {transition}
     ) -> Automaton,
 
-    changeState: (self: Automaton, name: string) -> (),
-    triggerEvent: (self: Automaton, event: string, ...any) -> (),
-    executeAction: (self: Automaton, name: string, ...any) -> ...any,
+    change: (self: Automaton, name: string) -> (),
+    trigger: (self: Automaton, event: string, ...any) -> (),
+    execute: (self: Automaton, name: string, ...any) -> ...any,
 }
 export type Automaton = typeof(setmetatable({} :: {
     state: string,
     _stateMap: {[string]: state},
-    _eventListenersMap: {[string]: {transition}},
+    _listenersMap: {[string]: {transition}},
 
     stateChanged: Signal,
 }, {} :: AutomatonClass))
@@ -86,7 +86,7 @@ function Automaton.new(
         stateMap[name] = state
     end
 
-    local eventListenersMap = {}
+    local listenersMap = {}
     for i, transition in ipairs(transitions) do
         if type(transition) ~= "table" then
             error(`expected table for transitions[{i}], got '{typeof(transition)}'`, 2)
@@ -112,28 +112,28 @@ function Automaton.new(
             end
         end
 
-        local eventListeners = eventListenersMap[event]
-        if eventListeners then
-            table.insert(eventListeners, transition)
+        local listeners = listenersMap[event]
+        if listeners then
+            table.insert(listeners, transition)
         else
-            eventListenersMap[event] = {transition}
+            listenersMap[event] = {transition}
         end
     end
 
     if not stateMap[initial] then
-        error(`initial '{initial}' does map to a state!`)
+        error(`initial '{initial}' does not map to a valid state!`)
     end
 
     return setmetatable({
         state = initial,
         _stateMap = stateMap,
-        _eventListenersMap = eventListenersMap,
+        _listenersMap = listenersMap,
 
         stateChanged = Signal.new(),
     }, Automaton)
 end
 
-function Automaton.changeState(self: Automaton, name: string): ()
+function Automaton.change(self: Automaton, name: string): ()
     if not Automaton.is(self) then
         error(`expected Automaton for self, got '{typeof(self)}'`, 2)
     elseif type(name) ~= "string" then
@@ -143,33 +143,33 @@ function Automaton.changeState(self: Automaton, name: string): ()
     local oldState = self._stateMap[self.state]
     local newState = self._stateMap[name]
     if not newState then
-        error(`name '{name}', does not map to a State!`, 2)
+        error(`name '{name}', does not map to a valid state!`, 2)
     end
 
-    local exitAction = oldState.actionMap["exit"]
-    if exitAction then
-        exitAction()
+    local exit = oldState.actionMap["exit"]
+    if exit then
+        exit()
     end
-    local enterAction = newState.actionMap["enter"]
-    if enterAction then
-        enterAction()
+    local enter = newState.actionMap["enter"]
+    if enter then
+        enter()
     end
 
     self.state = newState.name
     self.stateChanged:trigger(oldState.name, newState.name)
 end
 
-function Automaton.triggerEvent(self: Automaton, event: string, ...: any): ()
+function Automaton.trigger(self: Automaton, event: string, ...: any): ()
     if not Automaton.is(self) then
         error(`expected Automaton for self, got '{typeof(self)}'`, 2)
     elseif type(event) ~= "string" then
         error(`expected string for event, got '{typeof(event)}'`, 2)
     end
 
-    local eventListeners = self._eventListenersMap[event]
-    if eventListeners then
+    local listeners = self._listenersMap[event]
+    if listeners then
         local state = self.state
-        for _, transition in eventListeners do
+        for _, transition in listeners do
             local toState = transition.toState
             local condition = transition.condition
             if
@@ -177,25 +177,25 @@ function Automaton.triggerEvent(self: Automaton, event: string, ...: any): ()
                 and table.find(transition.fromStates, state)
                 and (not condition or condition(...))
             then
-                self:changeState(toState)
+                self:change(toState)
                 break
             end
         end
     end
 end
 
-function Automaton.executeAction(self: Automaton, name: string, ...: any): ...any
+function Automaton.execute(self: Automaton, name: string, ...: any): ...any
     if not Automaton.is(self) then
         error(`expected Automaton for self, got '{typeof(self)}'`, 2)
     elseif type(name) ~= "string" then
         error(`expected string for name, got '{typeof(name)}'`, 2)
     end
 
-    local currentState = self._stateMap[self.state]
-    local action = currentState.actionMap[name]
+    local state = self._stateMap[self.state]
+    local action = state.actionMap[name]
     if action then
         return action(...)
     end
 end
 
-return Automaton
+return table.freeze(Automaton)

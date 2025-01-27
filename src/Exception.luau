@@ -36,4 +36,4 @@ function Exception.new(id: string, message: string): Exception
     }, Exception)
 end
 
-return Exception
+return table.freeze(Exception)

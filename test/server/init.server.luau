@@ -47,13 +47,6 @@ local machine = Automaton.new(
     },
     {
         {
-            event = "go",
-            toState = "green",
-            fromStates = {
-                "red",
-            },
-        },
-        {
             event = "yield",
             toState = "yellow",
             fromStates = {
@@ -62,6 +55,13 @@ local machine = Automaton.new(
             condition = function(a)
                 return a == 3
             end
+        },
+        {
+            event = "go",
+            toState = "green",
+            fromStates = {
+                "red",
+            },
         },
         {
             event = "stop",
@@ -80,5 +80,5 @@ for index, event in ipairs({
     "stop",
 }) do
     print(`triggering event '{event}'...`)
-    machine:triggerEvent(event, index)
+    machine:trigger(event, index)
 end

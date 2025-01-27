@@ -89,4 +89,4 @@ function Connection.disconnect(self: Connection): ()
     end
 end
 
-return Connection
+return table.freeze(Connection)

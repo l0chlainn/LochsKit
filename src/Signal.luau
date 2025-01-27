@@ -100,4 +100,4 @@ function Signal.disconnectAll(self: Signal): ()
     end
 end
 
-return Signal
+return table.freeze(Signal)

@@ -25,11 +25,11 @@ type LochsKitLibrary = {
 }
 
 --[ LochsKit Library ]--
-local LochsKit: LochsKitLibrary = {
+local LochsKit: LochsKitLibrary = table.freeze({
     Automaton = Automaton,
     Exception = Exception,
     Signal = Signal,
     Connection = Connection,
-}
+})
 
 return LochsKit
