@@ -16,7 +16,7 @@ export type Exception = typeof(setmetatable({} :: {
 local Exception = {} :: ExceptionClass
 Exception.__index = Exception
 Exception.__tostring = function(exception: Exception): string
-    return `Error: '{exception.id}', Reason: '{exception.message}'`
+    return `ERR: '{exception.id}', REASON: '{exception.message}'`
 end
 
 function Exception.is(value: any): boolean

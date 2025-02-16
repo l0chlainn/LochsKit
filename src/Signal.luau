@@ -21,8 +21,23 @@ type SignalClass = {
     disconnectAll: (self: Signal) -> (),
 }
 export type Signal = typeof(setmetatable({} :: {
-    _connectionsListHead: Connection?,
+    _headConnection: Connection?,
 }, {} :: SignalClass))
+
+local idleRunnerThread: thread? = nil
+
+local function acquireRunnerThreadAndRunCallback(callback: callback, ...: any): ()
+    local acquiredRunnerThread = idleRunnerThread :: thread
+    idleRunnerThread = nil
+    callback(...)
+    idleRunnerThread = acquiredRunnerThread
+end
+
+local function persistentRunnerThread(): ()
+    while true do
+        acquireRunnerThreadAndRunCallback(coroutine.yield())
+    end
+end
 
 --[ Signal Class ]--
 local Signal = {} :: SignalClass
@@ -34,17 +49,17 @@ end
 
 function Signal.new(): Signal
     return setmetatable({
-        _connectionsListHead = nil,
+        _headConnection = nil,
     }, Signal)
 end
 
 function Signal._link(self: Signal, connection: Connection): ()
-    local headConnection = self._connectionsListHead
+    local headConnection = self._headConnection
     if headConnection then
         connection._nextConnection = headConnection
         headConnection._previousConnection = connection
     end
-    self._connectionsListHead = connection
+    self._headConnection = connection
 end
 
 function Signal._unlink(self: Signal, connection: Connection): ()
@@ -56,7 +71,7 @@ function Signal._unlink(self: Signal, connection: Connection): ()
     if previousConnection then
         previousConnection._nextConnection = nextConnection
     else
-        self._connectionsListHead = nextConnection
+        self._headConnection = nextConnection
     end
 end
 
@@ -65,9 +80,16 @@ function Signal.trigger(self: Signal, ...: any): ()
         error(`expected Signal for self, got '{typeof(self)}'`, 2)
     end
 
-    local connection = self._connectionsListHead
+    local connection = self._headConnection
     while connection do
-        connection:call(...)
+        if not idleRunnerThread then
+            idleRunnerThread = task.spawn(persistentRunnerThread)
+        end
+        task.spawn(
+            idleRunnerThread :: thread,
+            connection._signalCallback,
+            ...
+        )
         connection = connection._nextConnection
     end
 end
@@ -93,11 +115,12 @@ function Signal.disconnectAll(self: Signal): ()
         error(`expected Signal for self, got '{typeof(self)}'`, 2)
     end
 
-    local connection = self._connectionsListHead
+    local connection = self._headConnection
     while connection do
         connection:disconnect()
         connection = connection._nextConnection
     end
+    self._headConnection = nil
 end
 
 return table.freeze(Signal)
