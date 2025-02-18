@@ -52,8 +52,9 @@ local machine = Automaton.new(
             fromStates = {
                 "green",
             },
-            condition = function(a)
-                return a == 3
+            condition = function(fromState, ...)
+                print(fromState, ...)
+                return true
             end
         },
         {

@@ -6,7 +6,7 @@ local Signal = require(LochsKit:FindFirstChild("Signal"))
 type Signal = Signal.Signal
 
 type action = (...any) -> ...any
-type condition = (...any) -> boolean
+type condition = (fromState: string, ...any) -> boolean
 type state = {
     name: string,
     actionMap: {[string]: action},
@@ -62,24 +62,24 @@ function Automaton.new(
     end
 
     local stateMap = {}
-    for i, state in ipairs(states) do
+    for stateIndex, state in ipairs(states) do
         if type(state) ~= "table" then
-            error(`expected table for states[{i}], got '{typeof(state)}'`, 2)
+            error(`expected table for states[{stateIndex}], got '{typeof(state)}'`, 2)
         end
 
         local name = state.name
         local actionMap = state.actionMap
         if type(name) ~= "string" then
-            error(`expected string for states[{i}].name, got '{typeof(name)}'`, 2)
+            error(`expected string for states[{stateIndex}].name, got '{typeof(name)}'`, 2)
         elseif type(actionMap) ~= "table" then
-            error(`expected table for states[{i}].actionMap, got '{typeof(actionMap)}'`, 2)
+            error(`expected table for states[{stateIndex}].actionMap, got '{typeof(actionMap)}'`, 2)
         end
 
-        for j, action in pairs(actionMap) do
-            if type(j) ~= "string" then
-                error(`expected string for states[{i}].actionMap key, got '{typeof(j)}'`, 2)
+        for actionKey, action in pairs(actionMap) do
+            if type(actionKey) ~= "string" then
+                error(`expected string for states[{stateIndex}].actionMap key, got '{typeof(actionKey)}'`, 2)
             elseif type(action) ~= "function" then
-                error(`expected function for states[{i}].actionMap[{j}], got '{typeof(action)}'`, 2)
+                error(`expected function for states[{stateIndex}].actionMap[{actionKey}], got '{typeof(action)}'`, 2)
             end
         end
 
@@ -87,9 +87,9 @@ function Automaton.new(
     end
 
     local listenersMap = {}
-    for i, transition in ipairs(transitions) do
+    for transitionIndex, transition in ipairs(transitions) do
         if type(transition) ~= "table" then
-            error(`expected table for transitions[{i}], got '{typeof(transition)}'`, 2)
+            error(`expected table for transitions[{transitionIndex}], got '{typeof(transition)}'`, 2)
         end
 
         local event = transition.event
@@ -97,18 +97,18 @@ function Automaton.new(
         local fromStates = transition.fromStates
         local condition = transition.condition
         if type(event) ~= "string" then
-            error(`expected string for transitions[{i}].event, got '{typeof(event)}'`, 2)
+            error(`expected string for transitions[{transitionIndex}].event, got '{typeof(event)}'`, 2)
         elseif type(toState) ~= "string" then
-            error(`expected string for transitions[{i}].toState, got '{typeof(toState)}'`, 2)
+            error(`expected string for transitions[{transitionIndex}].toState, got '{typeof(toState)}'`, 2)
         elseif type(fromStates) ~= "table" then
-            error(`expected table for transitions[{i}].fromStates, got '{typeof(fromStates)}'`, 2)
+            error(`expected table for transitions[{transitionIndex}].fromStates, got '{typeof(fromStates)}'`, 2)
         elseif condition ~= nil and type(condition) ~= "function" then
-            error(`expected function for transitions[{i}].condition, got '{typeof(condition)}'`, 2)
+            error(`expected function for transitions[{transitionIndex}].condition, got '{typeof(condition)}'`, 2)
         end
 
-        for j, fromState in ipairs(fromStates) do
+        for fromStateIndex, fromState in ipairs(fromStates) do
             if type(fromState) ~= "string" then
-                error(`expected string for transitions[{i}].fromStates[{j}], got '{typeof(fromState)}'`, 2)
+                error(`expected string for transitions[{transitionIndex}].fromStates[{fromStateIndex}], got '{typeof(fromState)}'`, 2)
             end
         end
 
@@ -168,14 +168,14 @@ function Automaton.trigger(self: Automaton, event: string, ...: any): ()
 
     local listeners = self._listenersMap[event]
     if listeners then
-        local state = self.state
+        local fromState = self.state
         for _, transition in listeners do
             local toState = transition.toState
             local condition = transition.condition
             if
                 self._stateMap[toState]
-                and table.find(transition.fromStates, state)
-                and (not condition or condition(...))
+                and table.find(transition.fromStates, fromState)
+                and (not condition or condition(fromState, ...))
             then
                 self:change(toState)
                 break
