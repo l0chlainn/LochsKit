@@ -1,0 +1,26 @@
+{
+  "name": "LochsKit",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Common": {
+        "$className": "Folder",
+
+        "Packages": {
+          "$className": "Folder",
+
+          "LochsKit": {
+            "$path": "src"
+          }
+        }
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "test/server"
+      }
+    }
+  }
+}
