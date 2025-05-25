@@ -29,6 +29,12 @@ local function isAutomaton(value: any): boolean
 end
 
 local function createAutomaton(initial: string, transitions: {transition}): Automaton
+    if type(initial) ~= "string" then
+        error(`Invalid argument #1. (string expected, got {typeof(initial)})`, 2)
+    elseif type(transitions) ~= "table" then
+        error(`Invalid argument #2. (table expected, got {typeof(transitions)})`, 2)
+    end
+
     local states = {initial}
     local listenersMap = {}
     for index, transition in transitions do
@@ -56,7 +62,22 @@ local function createAutomaton(initial: string, transitions: {transition}): Auto
     }, Automaton)
 end
 
+function Automaton.destroy(self: Automaton): ()
+    if not isAutomaton(self) then
+        error(`Invalid argument #1. (Automaton expected, got {typeof(self)})`, 2)
+    end
+
+    self.stateChanging:disconnectAll()
+    self.stateChanged:disconnectAll()
+end
+
 function Automaton.change(self: Automaton, toState: string): ()
+    if not isAutomaton(self) then
+        error(`Invalid argument #1. (Automaton expected, got {typeof(self)})`, 2)
+    elseif type(toState) ~= "string" then
+        error(`Invalid argument #2. (string expected, got {typeof(toState)})`, 2)
+    end
+
     if table.find(self._states, toState) then
         local fromState = self.state
         self.stateChanging:fire(toState, fromState)
@@ -66,6 +87,12 @@ function Automaton.change(self: Automaton, toState: string): ()
 end
 
 function Automaton.fire(self: Automaton, event: string, ...: any): ()
+    if not isAutomaton(self) then
+        error(`Invalid argument #1. (Automaton expected, got {typeof(self)})`, 2)
+    elseif type(event) ~= "string" then
+        error(`Invalid argument #2. (string expected, got {typeof(event)})`, 2)
+    end
+
     local listeners = self._listenersMap[event]
     if listeners then
         local fromState = self.state

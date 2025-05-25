@@ -57,4 +57,6 @@ return function()
     print(`panic: {machine.state}`)
     machine:fire("panic", 123)
     print(`panic: {machine.state}`)
+
+    machine:destroy()
 end
