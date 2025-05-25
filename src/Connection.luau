@@ -23,6 +23,12 @@ local function createConnection(
     callback: callback,
     disconnect: callback
 ): Connection
+    if type(callback) ~= "function" then
+        error(`Invalid argument #1. (function expected, got {typeof(callback)})`, 2)
+    elseif type(disconnect) ~= "function" then
+        error(`Invalid argument #2. (function expected, got {typeof(disconnect)})`, 2)
+    end
+
     return setmetatable({
         isConnected = true,
 
@@ -35,14 +41,21 @@ local function createConnection(
 end
 
 function Connection.disconnect(self: Connection): ()
+    if not isConnection(self) then
+        error(`Invalid argument #1. (Connection expected, got {typeof(self)})`, 2)
+    end
+
     if self.isConnected then
         self.isConnected = false
 
-        (self._disconnect :: callback)()
+        -- I dislike this, it would work to do the following instead, but I don't like the risk.
+        -- (self._disconnect :: callback)()
+        local disconnect = self._disconnect
+        if disconnect then
+            disconnect()
+        end
 
-        -- It's important to clean these references up, since
-        -- they'll keep the Event alive if this connection isn't
-        -- cleared.
+        -- Clear these references, otherwise we may experience a memory leak.
         self._callback = nil
         self._disconnect = nil
     end

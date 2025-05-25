@@ -6,10 +6,9 @@ type Connection = Connection.Connection
 
 type callback = (...any) -> ()
 
--- We cache this here to avoid thread creation overhead.
--- This could be improved with a thread pool, since logically it would
--- follow that if a thread yields the first call, it's likely to yield
--- the next call too.
+-- Cache a runner thread here to avoid overhead of thread creation.
+-- It might be improved with a thread pool as it would logically follow
+-- that if a thread yields the first call it's going to yield the next call.
 local idleRunner: thread? = nil
 
 local function runCallback(callback: callback, ...: any): ()
@@ -19,7 +18,7 @@ local function runCallback(callback: callback, ...: any): ()
     idleRunner = busyRunner
 end
 
--- We need a runner so the thread does not die, allowing us to reuse it.
+-- Runner thread keeps the thread from dying, allowing us to reuse it.
 local function runner(): ()
     while true do
         runCallback(coroutine.yield())
@@ -48,6 +47,10 @@ local function createSignal(): Signal
 end
 
 function Signal.fire(self: Signal, ...: any): ()
+    if not isSignal(self) then
+        error(`Invalid argument #1. (Signal expected, got {typeof(self)})`, 2)
+    end
+
     self.isFiring = true
 
     local connection = self._headConnection
@@ -65,7 +68,7 @@ function Signal.fire(self: Signal, ...: any): ()
         connection = connection._next
     end
 
-    -- Any disconnection attempts made while firing are safe to remove now.
+    -- Disconnection attempts made while firing are safe to remove now.
     for _, disconnection in self._disconnections do
         disconnection._next = nil
         disconnection._previous = nil
@@ -76,6 +79,12 @@ function Signal.fire(self: Signal, ...: any): ()
 end
 
 function Signal._disconnect(self: Signal, connection: Connection): ()
+    if not isSignal(self) then
+        error(`Invalid argument #1. (Signal expected, got {typeof(self)})`, 2)
+    elseif not Connection.is(connection) then
+        error(`Invalid argument #2. (Connection expected, got {typeof(connection)})`, 2)
+    end
+
     local nextConnection = connection._next
     local previousConnection = connection._previous
     if nextConnection then
@@ -87,9 +96,8 @@ function Signal._disconnect(self: Signal, connection: Connection): ()
         self._headConnection = nextConnection
     end
 
-    -- We don't want to mess with a list in use, because it creates
-    -- navigation issues. Instead we'll queue it to be removed later,
-    -- but if the list isn't in use it's safe to remove now.
+    -- We can't unlink a list while it's being used as it creates
+    -- navigation issues. Instead queue it to be removed after the list is done.
     if self.isFiring then
         table.insert(self._disconnections, connection)
     else
@@ -99,6 +107,12 @@ function Signal._disconnect(self: Signal, connection: Connection): ()
 end
 
 function Signal.connect(self: Signal, callback: callback): Connection
+    if not isSignal(self) then
+        error(`Invalid argument #1. (Signal expected, got {typeof(self)})`, 2)
+    elseif type(callback) ~= "function" then
+        error(`Invalid argument #2. (function expected, got {typeof(callback)})`, 2)
+    end
+
     local connection
     connection = Connection.new(callback, function()
         self:_disconnect(connection)
@@ -115,6 +129,10 @@ function Signal.connect(self: Signal, callback: callback): Connection
 end
 
 function Signal.disconnectAll(self: Signal): ()
+    if not isSignal(self) then
+        error(`Invalid argument #1. (Signal expected, got {typeof(self)})`, 2)
+    end
+
     local isFiring = self.isFiring
     local disconnections = self._disconnections
     local connection = self._headConnection
@@ -122,12 +140,12 @@ function Signal.disconnectAll(self: Signal): ()
         if connection.isConnected then
             connection.isConnected = false
 
-            -- It's important to clean these references up, since
-            -- they'll keep the Signal alive if this connection isn't
-            -- cleared.
+            -- Clear these references, otherwise we may experience a memory leak.
             connection._callback = nil
             connection._disconnect = nil
 
+            -- We can't unlink a list while it's being used as it creates
+            -- navigation issues. Instead queue it to be removed after the list is done.
             if isFiring then
                 table.insert(disconnections, connection)
             else
