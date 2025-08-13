@@ -9,7 +9,7 @@ export type Connection = Connection.Connection
 export type Signal = Signal.Signal
 
 return table.freeze({
-    Automaton = Automaton,
-    Connection = Connection,
-    Signal = Signal,
+	Automaton = Automaton,
+	Connection = Connection,
+	Signal = Signal,
 })
