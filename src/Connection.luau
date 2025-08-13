@@ -1,67 +1,74 @@
 --!strict
 
-type callback = () -> ()
+type list = {
+	_headNode: node?,
+}
+type node = {
+	nextNode: node?,
+	previousNode: node?,
+}
 
 local Connection = {}
 Connection.__index = Connection
 
-export type Connection = typeof(setmetatable({} :: {
-    isConnected: boolean,
+export type Connection = typeof(setmetatable(
+	{} :: {
+		_isConnected: boolean,
 
-    _callback: callback?,
-    _disconnect: callback?,
-
-    _next: Connection?,
-    _previous: Connection?,
-}, Connection))
+		_list: list?,
+		_node: node?,
+	},
+	Connection
+))
 
 local function isConnection(value: any): boolean
-    return type(value) == "table" and getmetatable(value) == Connection
+	return type(value) == "table" and getmetatable(value) == Connection
 end
 
-local function createConnection(
-    callback: callback,
-    disconnect: callback
-): Connection
-    if type(callback) ~= "function" then
-        error(`Invalid argument #1. (function expected, got {typeof(callback)})`, 2)
-    elseif type(disconnect) ~= "function" then
-        error(`Invalid argument #2. (function expected, got {typeof(disconnect)})`, 2)
-    end
+local function createConnection(): Connection
+	return setmetatable({
+		_isConnected = true,
 
-    return setmetatable({
-        isConnected = true,
+		_list = nil,
+		_node = nil,
+	}, Connection)
+end
 
-        _callback = callback,
-        _disconnect = disconnect,
+function Connection.isConnected(self: Connection): boolean
+	if not isConnection(self) then
+		error(`Invalid argument #1. (Connection expected, got {typeof(self)})`, 2)
+	end
 
-        _next = nil,
-        _previous = nil,
-    }, Connection)
+	return self._isConnected
 end
 
 function Connection.disconnect(self: Connection): ()
-    if not isConnection(self) then
-        error(`Invalid argument #1. (Connection expected, got {typeof(self)})`, 2)
-    end
+	if not isConnection(self) then
+		error(`Invalid argument #1. (Connection expected, got {typeof(self)})`, 2)
+	end
 
-    if self.isConnected then
-        self.isConnected = false
+	if self._isConnected then
+		self._isConnected = false
 
-        -- I dislike this, it would work to do the following instead, but I don't like the risk.
-        -- (self._disconnect :: callback)()
-        local disconnect = self._disconnect
-        if disconnect then
-            disconnect()
-        end
+		local node = self._node :: node
+		local nextNode = node.nextNode
+		local previousNode = node.previousNode
+		if nextNode then
+			nextNode.previousNode = previousNode
+		end
+		if previousNode then
+			previousNode.nextNode = nextNode
+		else
+			local list = self._list :: list
+			list._headNode = nextNode
+		end
 
-        -- Clear these references, otherwise we may experience a memory leak.
-        self._callback = nil
-        self._disconnect = nil
-    end
+		self._list = nil
+		self._node = nil
+	end
 end
 
 return table.freeze({
-    is = isConnection,
-    new = createConnection,
+	is = isConnection,
+	new = createConnection,
 })
