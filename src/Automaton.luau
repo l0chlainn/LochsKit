@@ -4,7 +4,7 @@ local Signal = require(script.Parent:FindFirstChild("Signal"))
 
 type Signal = Signal.Signal
 
-type condition = (fromState: string, ...any) -> boolean
+type condition = (toState: string, fromState: string, event: string, ...any) -> boolean
 type transition = {
 	event: string,
 	toState: string,
@@ -17,7 +17,7 @@ Automaton.__index = Automaton
 
 export type Automaton = typeof(setmetatable(
 	{} :: {
-		_state: string,
+		state: string,
 		_states: { string },
 		_listenersMap: { [string]: { transition } },
 
@@ -31,14 +31,14 @@ local function isAutomaton(value: any): boolean
 	return type(value) == "table" and getmetatable(value) == Automaton
 end
 
-local function createAutomaton(initial: string, transitions: { transition }): Automaton
-	if type(initial) ~= "string" then
-		error(`Invalid argument #1. (string expected, got {typeof(initial)})`, 2)
+local function createAutomaton(state: string, transitions: { transition }): Automaton
+	if type(state) ~= "string" then
+		error(`Invalid argument #1. (string expected, got {typeof(state)})`, 2)
 	elseif type(transitions) ~= "table" then
 		error(`Invalid argument #2. (table expected, got {typeof(transitions)})`, 2)
 	end
 
-	local states = { initial }
+	local states = { state }
 	local listenersMap = {}
 	for _, transition in transitions do
 		local toState = transition.toState
@@ -56,7 +56,7 @@ local function createAutomaton(initial: string, transitions: { transition }): Au
 	end
 
 	return setmetatable({
-		_state = initial,
+		state = state,
 		_states = states,
 		_listenersMap = listenersMap,
 
@@ -74,30 +74,22 @@ function Automaton.destroy(self: Automaton): ()
 	self.stateChanged:destroy()
 end
 
-function Automaton.getState(self: Automaton): string
+function Automaton.change(self: Automaton, state: string): ()
 	if not isAutomaton(self) then
 		error(`Invalid argument #1. (Automaton expected, got {typeof(self)})`, 2)
+	elseif type(state) ~= "string" then
+		error(`Invalid argument #2. (string expected, got {typeof(state)})`, 2)
 	end
 
-	return self._state
-end
-
-function Automaton.changeState(self: Automaton, toState: string): ()
-	if not isAutomaton(self) then
-		error(`Invalid argument #1. (Automaton expected, got {typeof(self)})`, 2)
-	elseif type(toState) ~= "string" then
-		error(`Invalid argument #2. (string expected, got {typeof(toState)})`, 2)
-	end
-
-	if table.find(self._states, toState) then
-		local fromState = self._state
-		self.stateChanging:fire(toState, fromState)
-		self._state = toState
-		self.stateChanged:fire(toState, fromState)
+	if table.find(self._states, state) then
+		local fromState = self.state
+		self.stateChanging:send(state, fromState)
+		self.state = state
+		self.stateChanged:send(state, fromState)
 	end
 end
 
-function Automaton.fire(self: Automaton, event: string, ...: any): ()
+function Automaton.send(self: Automaton, event: string, ...: any): ()
 	if not isAutomaton(self) then
 		error(`Invalid argument #1. (Automaton expected, got {typeof(self)})`, 2)
 	elseif type(event) ~= "string" then
@@ -106,17 +98,21 @@ function Automaton.fire(self: Automaton, event: string, ...: any): ()
 
 	local listeners = self._listenersMap[event]
 	if listeners then
-		local fromState = self._state
+		local fromState = self.state
 		for _, transition in listeners do
-			if table.find(transition.fromStates, fromState) then
-				local condition = transition.condition
-				if condition and not condition(fromState, ...) then
-					continue
-				end
-
-				self:changeState(transition.toState)
-				break
+			if not table.find(transition.fromStates, fromState) then
+				continue
 			end
+
+			local tostate = transition.toState
+			local condition = transition.condition
+			if condition and not condition(tostate, fromState, event, ...) then
+				continue
+			end
+
+			self:change(tostate)
+
+			break
 		end
 	end
 end
