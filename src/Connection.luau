@@ -13,7 +13,7 @@ Connection.__index = Connection
 
 export type Connection = typeof(setmetatable(
 	{} :: {
-		_isConnected: boolean,
+		isConnected: boolean,
 
 		_list: list?,
 		_node: node?,
@@ -25,21 +25,19 @@ local function isConnection(value: any): boolean
 	return type(value) == "table" and getmetatable(value) == Connection
 end
 
-local function createConnection(): Connection
-	return setmetatable({
-		_isConnected = true,
-
-		_list = nil,
-		_node = nil,
-	}, Connection)
-end
-
-function Connection.isConnected(self: Connection): boolean
-	if not isConnection(self) then
-		error(`Invalid argument #1. (Connection expected, got {typeof(self)})`, 2)
+local function createConnection(list: list, node: node): Connection
+	if type(list) ~= "table" then
+		error(`Invalid argument #1. (table expected, got {typeof(list)})`, 2)
+	elseif type(node) ~= "table" then
+		error(`Invalid argument #2. (table expected, got {typeof(node)})`, 2)
 	end
 
-	return self._isConnected
+	return setmetatable({
+		isConnected = true,
+
+		_list = list,
+		_node = node,
+	}, Connection)
 end
 
 function Connection.disconnect(self: Connection): ()
@@ -47,8 +45,8 @@ function Connection.disconnect(self: Connection): ()
 		error(`Invalid argument #1. (Connection expected, got {typeof(self)})`, 2)
 	end
 
-	if self._isConnected then
-		self._isConnected = false
+	if self.isConnected then
+		self.isConnected = false
 
 		local node = self._node :: node
 		local nextNode = node.nextNode

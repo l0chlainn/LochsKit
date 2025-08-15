@@ -62,23 +62,6 @@ function Signal.destroy(self: Signal): ()
 	self._headNode = nil
 end
 
-function Signal.fire(self: Signal, ...: any): ()
-	if not isSignal(self) then
-		error(`Invalid argument #1. (Signal expected, got {typeof(self)})`, 2)
-	end
-
-	local node = self._headNode
-	while node do
-		if node.connection:isConnected() then
-			if not idleRunner then
-				idleRunner = task.spawn(runner)
-			end
-			task.spawn(idleRunner :: thread, node.callback, ...)
-		end
-		node = node.nextNode
-	end
-end
-
 function Signal.connect(self: Signal, callback: callback): Connection
 	if not isSignal(self) then
 		error(`Invalid argument #1. (Signal expected, got {typeof(self)})`, 2)
@@ -86,15 +69,12 @@ function Signal.connect(self: Signal, callback: callback): Connection
 		error(`Invalid argument #2. (function expected, got {typeof(callback)})`, 2)
 	end
 
-	local connection = Connection.new()
 	local node = {
 		nextNode = nil,
 		previousNode = nil,
 		callback = callback,
-		connection = connection,
+		connection = nil :: any,
 	} :: node
-	connection._list = self :: any
-	connection._node = node
 
 	local headNode = self._headNode
 	if headNode then
@@ -103,7 +83,27 @@ function Signal.connect(self: Signal, callback: callback): Connection
 	end
 	self._headNode = node
 
+	local connection = Connection.new(self :: any, node)
+	node.connection = connection
+
 	return connection
+end
+
+function Signal.send(self: Signal, ...: any): ()
+	if not isSignal(self) then
+		error(`Invalid argument #1. (Signal expected, got {typeof(self)})`, 2)
+	end
+
+	local node = self._headNode
+	while node do
+		if node.connection.isConnected then
+			if not idleRunner then
+				idleRunner = task.spawn(runner)
+			end
+			task.spawn(idleRunner :: thread, node.callback, ...)
+		end
+		node = node.nextNode
+	end
 end
 
 return table.freeze({

@@ -16,7 +16,7 @@ return function()
 			event = "panic",
 			toState = "emergency",
 			fromStates = { "green", "yellow", "red" },
-			condition = function(_, code)
+			condition = function(_, _, _, code)
 				return code == 123
 			end,
 		},
@@ -43,20 +43,20 @@ return function()
 		print(`colour changed to {colour}`)
 	end)
 
-	machine:changeState("purple")
+	machine:change("purple")
 
-	print(`initial: {machine:getState()}`)
-	machine:fire("go")
-	print(`go: {machine:getState()}`)
-	machine:fire("yield")
-	print(`yield: {machine:getState()}`)
-	machine:fire("stop")
-	print(`stop: {machine:getState()}`)
+	print(`initial: {machine.state}`)
+	machine:send("go")
+	print(`go: {machine.state}`)
+	machine:send("yield")
+	print(`yield: {machine.state}`)
+	machine:send("stop")
+	print(`stop: {machine.state}`)
 
-	machine:fire("panic", 0)
-	print(`panic: {machine:getState()}`)
-	machine:fire("panic", 123)
-	print(`panic: {machine:getState()}`)
+	machine:send("panic", 0)
+	print(`panic: {machine.state}`)
+	machine:send("panic", 123)
+	print(`panic: {machine.state}`)
 
 	machine:destroy()
 end
