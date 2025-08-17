@@ -106,6 +106,8 @@ function Signal.send(self: Signal, ...: any): ()
 	end
 end
 
+table.freeze(Signal)
+
 return table.freeze({
 	is = isSignal,
 	new = createSignal,

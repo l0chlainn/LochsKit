@@ -66,6 +66,8 @@ function Connection.disconnect(self: Connection): ()
 	end
 end
 
+table.freeze(Connection)
+
 return table.freeze({
 	is = isConnection,
 	new = createConnection,

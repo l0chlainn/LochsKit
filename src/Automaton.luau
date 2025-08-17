@@ -117,6 +117,8 @@ function Automaton.send(self: Automaton, event: string, ...: any): ()
 	end
 end
 
+table.freeze(Automaton)
+
 return table.freeze({
 	is = isAutomaton,
 	new = createAutomaton,
