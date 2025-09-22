@@ -4,8 +4,8 @@ type list = {
 	_headNode: node?,
 }
 type node = {
-	nextNode: node?,
-	previousNode: node?,
+	next: node?,
+	previous: node?,
 }
 
 local Connection = {}
@@ -26,12 +26,6 @@ local function isConnection(value: any): boolean
 end
 
 local function createConnection(list: list, node: node): Connection
-	if type(list) ~= "table" then
-		error(`Invalid argument #1. (table expected, got {typeof(list)})`, 2)
-	elseif type(node) ~= "table" then
-		error(`Invalid argument #2. (table expected, got {typeof(node)})`, 2)
-	end
-
 	return setmetatable({
 		isConnected = true,
 
@@ -41,21 +35,17 @@ local function createConnection(list: list, node: node): Connection
 end
 
 function Connection.disconnect(self: Connection): ()
-	if not isConnection(self) then
-		error(`Invalid argument #1. (Connection expected, got {typeof(self)})`, 2)
-	end
-
 	if self.isConnected then
 		self.isConnected = false
 
 		local node = self._node :: node
-		local nextNode = node.nextNode
-		local previousNode = node.previousNode
+		local nextNode = node.next
+		local previousNode = node.previous
 		if nextNode then
-			nextNode.previousNode = previousNode
+			nextNode.previous = previousNode
 		end
 		if previousNode then
-			previousNode.nextNode = nextNode
+			previousNode.next = nextNode
 		else
 			local list = self._list :: list
 			list._headNode = nextNode
