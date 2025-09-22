@@ -4,7 +4,7 @@ local Signal = require(script.Parent:FindFirstChild("Signal"))
 
 type Signal = Signal.Signal
 
-type callback = () -> ()
+type callback = (...any) -> ...any
 type state = {
 	name: string,
 	[string]: callback?,
@@ -104,7 +104,7 @@ function Automaton.execute(self: Automaton, action: string, ...: any): ()
 	local currentState = self._statesMap[self.state]
 	local callback = currentState[action]
 	if callback then
-		callback(...)
+		return callback(...)
 	end
 end
 
