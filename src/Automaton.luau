@@ -4,11 +4,17 @@ local Signal = require(script.Parent:FindFirstChild("Signal"))
 
 type Signal = Signal.Signal
 
-type condition = (toState: string, fromState: string, event: string, ...any) -> boolean
+type callback = () -> ()
+type state = {
+	name: string,
+	[string]: callback?,
+}
+
+type condition = (event: string, to: string, from: string, ...any) -> boolean
 type transition = {
 	event: string,
-	toState: string,
-	fromStates: { string },
+	to: string,
+	from: { string },
 	condition: condition?,
 }
 
@@ -18,10 +24,9 @@ Automaton.__index = Automaton
 export type Automaton = typeof(setmetatable(
 	{} :: {
 		state: string,
-		_states: { string },
+		_statesMap: { [string]: state },
 		_listenersMap: { [string]: { transition } },
 
-		stateChanging: Signal,
 		stateChanged: Signal,
 	},
 	Automaton
@@ -31,19 +36,21 @@ local function isAutomaton(value: any): boolean
 	return type(value) == "table" and getmetatable(value) == Automaton
 end
 
-local function createAutomaton(state: string, transitions: { transition }): Automaton
-	if type(state) ~= "string" then
-		error(`Invalid argument #1. (string expected, got {typeof(state)})`, 2)
-	elseif type(transitions) ~= "table" then
-		error(`Invalid argument #2. (table expected, got {typeof(transitions)})`, 2)
+local function createAutomaton(initial: string, states: { state }, transitions: { transition }): Automaton
+	local statesMap = {}
+	for _, state in states do
+		statesMap[state.name] = state
 	end
 
-	local states = { state }
+	if not statesMap[initial] then
+		error(`Invalid initial state '{initial}'.`, 2)
+	end
+
 	local listenersMap = {}
-	for _, transition in transitions do
-		local toState = transition.toState
-		if not table.find(states, toState) then
-			table.insert(states, toState)
+	for index, transition in transitions do
+		local to = transition.to
+		if not statesMap[to] then
+			error(`Invalid target state '{to}' in transition #{index}.`, 2)
 		end
 
 		local event = transition.event
@@ -56,62 +63,67 @@ local function createAutomaton(state: string, transitions: { transition }): Auto
 	end
 
 	return setmetatable({
-		state = state,
-		_states = states,
+		state = initial,
+		_statesMap = statesMap,
 		_listenersMap = listenersMap,
 
-		stateChanging = Signal.new(),
 		stateChanged = Signal.new(),
 	}, Automaton)
 end
 
 function Automaton.destroy(self: Automaton): ()
-	if not isAutomaton(self) then
-		error(`Invalid argument #1. (Automaton expected, got {typeof(self)})`, 2)
-	end
-
-	self.stateChanging:destroy()
 	self.stateChanged:destroy()
 end
 
 function Automaton.change(self: Automaton, state: string): ()
-	if not isAutomaton(self) then
-		error(`Invalid argument #1. (Automaton expected, got {typeof(self)})`, 2)
-	elseif type(state) ~= "string" then
-		error(`Invalid argument #2. (string expected, got {typeof(state)})`, 2)
+	local current = self.state
+	if state == current then
+		return
 	end
 
-	if table.find(self._states, state) then
-		local fromState = self.state
-		self.stateChanging:send(state, fromState)
-		self.state = state
-		self.stateChanged:send(state, fromState)
+	local statesMap = self._statesMap
+	local currentState = statesMap[current]
+	local targetState = statesMap[state]
+	if not targetState then
+		error(`Invalid target state '{state}'.`, 2)
+	end
+
+	local exit = currentState.exit
+	if exit then
+		exit()
+	end
+	self.state = state
+	local enter = targetState.enter
+	if enter then
+		enter()
+	end
+	self.stateChanged:send(state, current)
+end
+
+function Automaton.execute(self: Automaton, action: string, ...: any): ()
+	local currentState = self._statesMap[self.state]
+	local callback = currentState[action]
+	if callback then
+		callback(...)
 	end
 end
 
 function Automaton.send(self: Automaton, event: string, ...: any): ()
-	if not isAutomaton(self) then
-		error(`Invalid argument #1. (Automaton expected, got {typeof(self)})`, 2)
-	elseif type(event) ~= "string" then
-		error(`Invalid argument #2. (string expected, got {typeof(event)})`, 2)
-	end
-
 	local listeners = self._listenersMap[event]
 	if listeners then
-		local fromState = self.state
+		local current = self.state
 		for _, transition in listeners do
-			if not table.find(transition.fromStates, fromState) then
+			if not table.find(transition.from, current) then
 				continue
 			end
 
-			local tostate = transition.toState
+			local target = transition.to
 			local condition = transition.condition
-			if condition and not condition(tostate, fromState, event, ...) then
+			if condition and not condition(event, target, current, ...) then
 				continue
 			end
 
-			self:change(tostate)
-
+			self:change(target)
 			break
 		end
 	end

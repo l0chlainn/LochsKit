@@ -13,37 +13,61 @@ return function()
 	local colour = "red"
 	local machine = Automaton.new(colour, {
 		{
+			name = "green",
+			enter = function()
+				colour = "green"
+			end,
+		},
+		{
+			name = "yellow",
+			enter = function()
+				colour = "yellow"
+			end,
+		},
+		{
+			name = "red",
+			enter = function()
+				colour = "red"
+			end,
+		},
+		{
+			name = "emergency",
+			enter = function()
+				colour = "emergency"
+			end,
+			say = function(...)
+				print(...)
+			end,
+		},
+	}, {
+		{
+			event = "go",
+			to = "green",
+			from = { "red" },
+		},
+		{
+			event = "yield",
+			to = "yellow",
+			from = { "green" },
+		},
+		{
+			event = "stop",
+			to = "red",
+			from = { "yellow" },
+		},
+		{
 			event = "panic",
-			toState = "emergency",
-			fromStates = { "green", "yellow", "red" },
+			to = "emergency",
+			from = { "green", "yellow", "red" },
 			condition = function(_, _, _, code)
 				return code == 123
 			end,
 		},
-		{
-			event = "go",
-			toState = "green",
-			fromStates = { "red" },
-		},
-		{
-			event = "yield",
-			toState = "yellow",
-			fromStates = { "green" },
-		},
-		{
-			event = "stop",
-			toState = "red",
-			fromStates = { "yellow" },
-		},
 	})
-	print(`machine is an Automaton: {Automaton.is(machine)}`)
 
-	machine.stateChanging:connect(function(toState)
-		colour = toState
-		print(`colour changed to {colour}`)
+	machine.stateChanged:connect(function(to)
+		print(`colour changed to {to}, colour is {colour}`)
 	end)
-
-	machine:change("purple")
 
 	print(`initial: {machine.state}`)
 	machine:send("go")
@@ -57,6 +81,8 @@ return function()
 	print(`panic: {machine.state}`)
 	machine:send("panic", 123)
 	print(`panic: {machine.state}`)
+
+	machine:execute("say", "Hello, Panicked World!")
 
 	machine:destroy()
 end
