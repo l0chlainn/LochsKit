@@ -4,15 +4,11 @@
     "$className": "DataModel",
 
     "ReplicatedStorage": {
-      "Common": {
+      "Packages": {
         "$className": "Folder",
 
-        "Packages": {
-          "$className": "Folder",
-
-          "LochsKit": {
-            "$path": "src"
-          }
+        "LochsKit": {
+          "$path": "src"
         }
       }
     },

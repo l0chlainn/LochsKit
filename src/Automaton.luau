@@ -1,6 +1,7 @@
 --!strict
 
-local Signal = require(script.Parent:FindFirstChild("Signal"))
+local LochsKit = script.Parent
+local Signal = require(LochsKit.Signal)
 
 type Signal = Signal.Signal
 
@@ -62,12 +63,14 @@ local function createAutomaton(initial: string, states: { state }, transitions: 
 		end
 	end
 
+	local stateChanged = Signal.new()
+
 	return setmetatable({
 		state = initial,
 		_statesMap = statesMap,
 		_listenersMap = listenersMap,
 
-		stateChanged = Signal.new(),
+		stateChanged = stateChanged,
 	}, Automaton)
 end
 
@@ -75,32 +78,29 @@ function Automaton.destroy(self: Automaton): ()
 	self.stateChanged:destroy()
 end
 
-function Automaton.change(self: Automaton, state: string): ()
-	local current = self.state
-	if state == current then
-		return
-	end
-
+function Automaton.change(self: Automaton, to: string): ()
+	local from = self.state
 	local statesMap = self._statesMap
-	local currentState = statesMap[current]
-	local targetState = statesMap[state]
-	if not targetState then
-		error(`Invalid target state '{state}'.`, 2)
+
+	local fromState = statesMap[from]
+	local toState = statesMap[to]
+	if not toState then
+		error(`Invalid target state '{to}'.`, 2)
 	end
 
-	local exit = currentState.exit
+	local exit = fromState.exit
 	if exit then
 		exit()
 	end
-	self.state = state
-	local enter = targetState.enter
+	self.state = to
+	local enter = toState.enter
 	if enter then
 		enter()
 	end
-	self.stateChanged:send(state, current)
+	self.stateChanged:send(to, from)
 end
 
-function Automaton.execute(self: Automaton, action: string, ...: any): ()
+function Automaton.execute(self: Automaton, action: string, ...: any): ...any
 	local currentState = self._statesMap[self.state]
 	local callback = currentState[action]
 	if callback then
@@ -111,20 +111,16 @@ end
 function Automaton.send(self: Automaton, event: string, ...: any): ()
 	local listeners = self._listenersMap[event]
 	if listeners then
-		local current = self.state
+		local from = self.state
 		for _, transition in listeners do
-			if not table.find(transition.from, current) then
-				continue
+			if table.find(transition.from, from) then
+				local to = transition.to
+				local condition = transition.condition
+				if not condition or condition(event, to, from, ...) then
+					self:change(to)
+					break
+				end
 			end
-
-			local target = transition.to
-			local condition = transition.condition
-			if condition and not condition(event, target, current, ...) then
-				continue
-			end
-
-			self:change(target)
-			break
 		end
 	end
 end

@@ -2,10 +2,9 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Common = ReplicatedStorage:FindFirstChild("Common")
-local Packages = Common:FindFirstChild("Packages")
+local Packages = ReplicatedStorage.Packages
 
-local LochsKit = require(Packages:FindFirstChild("LochsKit"))
+local LochsKit = require(Packages.LochsKit)
 
 local Automaton = LochsKit.Automaton
 
