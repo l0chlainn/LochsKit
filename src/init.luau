@@ -1,8 +1,9 @@
 --!strict
 
-local Automaton = require(script:FindFirstChild("Automaton"))
-local Connection = require(script:FindFirstChild("Connection"))
-local Signal = require(script:FindFirstChild("Signal"))
+local LochsKit = script
+local Automaton = require(LochsKit.Automaton)
+local Connection = require(LochsKit.Connection)
+local Signal = require(LochsKit.Signal)
 
 export type Automaton = Automaton.Automaton
 export type Connection = Connection.Connection
