@@ -8,14 +8,16 @@ type Signal = Signal.Signal
 type callback = (...any) -> ...any
 type state = {
 	name: string,
+	enter: callback?,
+	exit: callback?,
 	[string]: callback?,
 }
 
-type condition = (event: string, to: string, from: string, ...any) -> boolean
+type condition = (...any) -> boolean
 type transition = {
-	event: string,
-	to: string,
-	from: { string },
+	trigger: string,
+	target: string,
+	sources: { string },
 	condition: condition?,
 }
 
@@ -25,8 +27,8 @@ Automaton.__index = Automaton
 export type Automaton = typeof(setmetatable(
 	{} :: {
 		state: string,
-		_statesMap: { [string]: state },
-		_listenersMap: { [string]: { transition } },
+		_statesMap: { [string]: state? },
+		_transitionsMap: { [string]: { transition }? },
 
 		stateChanged: Signal,
 	},
@@ -44,22 +46,29 @@ local function createAutomaton(initial: string, states: { state }, transitions: 
 	end
 
 	if not statesMap[initial] then
-		error(`Invalid initial state '{initial}'.`, 2)
+		error(`Initial state '{initial}' is not a valid state.`, 2)
 	end
 
-	local listenersMap = {}
+	local transitionsMap = {}
 	for index, transition in transitions do
-		local to = transition.to
-		if not statesMap[to] then
-			error(`Invalid target state '{to}' in transition #{index}.`, 2)
+		local target = transition.target
+		if not statesMap[target] then
+			error(`Transition target '{target}' at index #{index} is not a valid state.`, 2)
 		end
 
-		local event = transition.event
-		local listeners = listenersMap[event]
-		if listeners then
-			table.insert(listeners, transition)
+		local sources = transition.sources
+		for _, source in sources do
+			if not statesMap[source] then
+				error(`Transition source '{source}' at index #{index} is not a valid state.`, 2)
+			end
+		end
+
+		local trigger = transition.trigger
+		local group = transitionsMap[trigger]
+		if group then
+			table.insert(group, transition)
 		else
-			listenersMap[event] = { transition }
+			transitionsMap[trigger] = { transition }
 		end
 	end
 
@@ -68,60 +77,62 @@ local function createAutomaton(initial: string, states: { state }, transitions: 
 	return setmetatable({
 		state = initial,
 		_statesMap = statesMap,
-		_listenersMap = listenersMap,
+		_transitionsMap = transitionsMap,
 
 		stateChanged = stateChanged,
 	}, Automaton)
 end
 
-function Automaton.destroy(self: Automaton): ()
-	self.stateChanged:destroy()
-end
-
-function Automaton.change(self: Automaton, to: string): ()
-	local from = self.state
+function Automaton.change(self: Automaton, target: string): ()
+	local source = self.state
 	local statesMap = self._statesMap
 
-	local fromState = statesMap[from]
-	local toState = statesMap[to]
-	if not toState then
-		error(`Invalid target state '{to}'.`, 2)
+	local sourceState = statesMap[source] :: state
+	local targetState = statesMap[target]
+	if not targetState then
+		error(`Target state '{target}' is not a valid state.`, 2)
 	end
 
-	local exit = fromState.exit
+	local exit = sourceState.exit
 	if exit then
 		exit()
 	end
-	self.state = to
-	local enter = toState.enter
+	local enter = targetState.enter
 	if enter then
 		enter()
 	end
-	self.stateChanged:send(to, from)
+	self.state = target
+	self.stateChanged:fire(target, source)
 end
 
-function Automaton.execute(self: Automaton, action: string, ...: any): ...any
-	local currentState = self._statesMap[self.state]
-	local callback = currentState[action]
-	if callback then
-		return callback(...)
+function Automaton.trigger(self: Automaton, trigger: string, ...: any): ()
+	local transitions = self._transitionsMap[trigger]
+	if not transitions then
+		return
+	end
+
+	local source = self.state
+	for _, transition in transitions do
+		if not table.find(transition.sources, source) then
+			continue
+		end
+
+		local condition = transition.condition
+		if condition and not condition(...) then
+			continue
+		end
+
+		local target = transition.target
+		self:change(target)
+		break
 	end
 end
 
-function Automaton.send(self: Automaton, event: string, ...: any): ()
-	local listeners = self._listenersMap[event]
-	if listeners then
-		local from = self.state
-		for _, transition in listeners do
-			if table.find(transition.from, from) then
-				local to = transition.to
-				local condition = transition.condition
-				if not condition or condition(event, to, from, ...) then
-					self:change(to)
-					break
-				end
-			end
-		end
+function Automaton.invoke(self: Automaton, action: string, ...: any): ...any
+	local state = self._statesMap[self.state] :: state
+	local callback = state[action]
+	if callback then
+		return callback(...)
 	end
 end
 
