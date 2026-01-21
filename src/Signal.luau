@@ -6,27 +6,32 @@ local Connection = require(LochsKit.Connection)
 type Connection = Connection.Connection
 
 type callback = (...any) -> ()
-type node = {
-	next: node?,
-	previous: node?,
-	callback: callback,
-	connection: Connection,
-}
 
--- Cache a runner thread here to avoid overhead of thread creation.
-local idleRunner: thread? = nil
+-- Cache a caller to avoid thread creation overhead.
+local idleCaller: thread? = nil
 
-local function runCallback(callback: callback, ...: any): ()
-	local busyRunner = idleRunner :: thread
-	idleRunner = nil
+local function call(callback: callback, ...: any): ()
+	local busyCaller = idleCaller :: thread
+	idleCaller = nil
 	callback(...)
-	idleRunner = busyRunner
+	idleCaller = busyCaller
 end
 
--- Runner thread keeps the thread from dying, allowing us to reuse it.
-local function runner(): ()
+local function caller(): ()
 	while true do
-		runCallback(coroutine.yield())
+		call(coroutine.yield())
+	end
+end
+
+local function spawner(connection: Connection?, ...: any): ()
+	while connection do
+		if connection.isConnected then
+			if not idleCaller then
+				idleCaller = task.spawn(caller)
+			end
+			task.spawn(idleCaller :: thread, connection._callback, ...)
+		end
+		connection = connection._nextConnection
 	end
 end
 
@@ -35,7 +40,7 @@ Signal.__index = Signal
 
 export type Signal = typeof(setmetatable(
 	{} :: {
-		_headNode: node?,
+		_headConnection: Connection?,
 	},
 	Signal
 ))
@@ -46,50 +51,35 @@ end
 
 local function createSignal(): Signal
 	return setmetatable({
-		_headNode = nil,
+		_headConnection = nil,
 	}, Signal)
 end
 
-function Signal.destroy(self: Signal): ()
-	local node = self._headNode
-	while node do
-		node.connection:disconnect()
-		node = node.next
-	end
-	self._headNode = nil
-end
-
 function Signal.connect(self: Signal, callback: callback): Connection
-	local node = {
-		next = nil,
-		previous = nil,
-		callback = callback,
-		connection = nil :: any,
-	} :: node
-
-	local headNode = self._headNode
-	if headNode then
-		node.next = headNode
-		headNode.previous = node
+	local newConnection = Connection.new(self :: any, callback)
+	local headConnection = self._headConnection
+	if headConnection then
+		newConnection._nextConnection = headConnection
+		headConnection._previousConnection = newConnection
 	end
-	self._headNode = node
+	self._headConnection = newConnection
 
-	local connection = Connection.new(self :: any, node)
-	node.connection = connection
-
-	return connection
+	return newConnection
 end
 
-function Signal.send(self: Signal, ...: any): ()
-	local node = self._headNode
-	while node do
-		if node.connection.isConnected then
-			if not idleRunner then
-				idleRunner = task.spawn(runner)
-			end
-			task.spawn(idleRunner :: thread, node.callback, ...)
-		end
-		node = node.next
+function Signal.disconnect(self: Signal): ()
+	local connection = self._headConnection
+	while connection do
+		connection.isConnected = false
+		connection = connection._nextConnection
+	end
+	self._headConnection = nil
+end
+
+function Signal.fire(self: Signal, ...: any): ()
+	local connection = self._headConnection
+	if connection then
+		task.defer(spawner, connection, ...)
 	end
 end
 
