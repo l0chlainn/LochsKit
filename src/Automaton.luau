@@ -74,13 +74,19 @@ local function createAutomaton(initial: string, states: { state }, transitions: 
 
 	local stateChanged = Signal.new()
 
-	return setmetatable({
+	local self = setmetatable({
 		state = initial,
 		_statesMap = statesMap,
 		_transitionsMap = transitionsMap,
 
 		stateChanged = stateChanged,
 	}, Automaton)
+
+	return self
+end
+
+function Automaton.destroy(self: Automaton): ()
+	self.stateChanged:destroy()
 end
 
 function Automaton.change(self: Automaton, target: string): ()
