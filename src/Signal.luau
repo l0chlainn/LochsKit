@@ -24,14 +24,21 @@ local function caller(): ()
 end
 
 local function spawner(connection: Connection?, ...: any): ()
+	-- It's possible for a disconnect to occur in a thread, destroying our navigation.
+	-- By cacheing our connections first, we avoid this navigation issue.
+	local connections = {}
 	while connection do
-		if connection.isConnected then
+		table.insert(connections, connection)
+		connection = connection._nextConnection
+	end
+
+	for _, conn in connections do
+		if conn.isConnected then
 			if not idleCaller then
 				idleCaller = task.spawn(caller)
 			end
-			task.spawn(idleCaller :: thread, connection._callback, ...)
+			task.spawn(idleCaller :: thread, conn._callback, ...)
 		end
-		connection = connection._nextConnection
 	end
 end
 
@@ -50,9 +57,15 @@ local function isSignal(value: any): boolean
 end
 
 local function createSignal(): Signal
-	return setmetatable({
+	local self = setmetatable({
 		_headConnection = nil,
 	}, Signal)
+
+	return self
+end
+
+function Signal.destroy(self: Signal): ()
+	self:disconnectAll()
 end
 
 function Signal.connect(self: Signal, callback: callback): Connection
@@ -67,11 +80,19 @@ function Signal.connect(self: Signal, callback: callback): Connection
 	return newConnection
 end
 
-function Signal.disconnect(self: Signal): ()
+function Signal.disconnectAll(self: Signal): ()
 	local connection = self._headConnection
 	while connection do
 		connection.isConnected = false
-		connection = connection._nextConnection
+
+		connection._signal = nil
+		connection._callback = nil
+
+		local nextConnection = connection._nextConnection
+		connection._nextConnection = nil
+		connection._previousConnection = nil
+
+		connection = nextConnection
 	end
 	self._headConnection = nil
 end

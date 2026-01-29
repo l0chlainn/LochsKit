@@ -13,8 +13,8 @@ export type Connection = typeof(setmetatable(
 	{} :: {
 		isConnected: boolean,
 
-		_signal: Signal,
-		_callback: callback,
+		_signal: Signal?,
+		_callback: callback?,
 
 		_nextConnection: Connection?,
 		_previousConnection: Connection?,
@@ -27,7 +27,7 @@ local function isConnection(value: any): boolean
 end
 
 local function createConnection(signal: Signal, callback: callback): Connection
-	return setmetatable({
+	local self = setmetatable({
 		isConnected = true,
 
 		_signal = signal,
@@ -36,6 +36,8 @@ local function createConnection(signal: Signal, callback: callback): Connection
 		_nextConnection = nil,
 		_previousConnection = nil,
 	}, Connection)
+
+	return self
 end
 
 function Connection.disconnect(self: Connection): ()
@@ -53,6 +55,12 @@ function Connection.disconnect(self: Connection): ()
 			local signal = self._signal :: Signal
 			signal._headConnection = nextConnection
 		end
+
+		self._signal = nil
+		self._callback = nil
+
+		self._nextConnection = nil
+		self._previousConnection = nil
 	end
 end
 
