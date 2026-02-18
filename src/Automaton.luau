@@ -44,7 +44,6 @@ local function createAutomaton(initial: string, states: { state }, transitions: 
 	for _, state in states do
 		statesMap[state.name] = state
 	end
-
 	if not statesMap[initial] then
 		error(`Initial state '{initial}' is not a valid state.`, 2)
 	end
@@ -72,26 +71,20 @@ local function createAutomaton(initial: string, states: { state }, transitions: 
 		end
 	end
 
-	local stateChanged = Signal.new()
-
 	local self = setmetatable({
 		state = initial,
 		_statesMap = statesMap,
 		_transitionsMap = transitionsMap,
 
-		stateChanged = stateChanged,
+		stateChanged = Signal.new(),
 	}, Automaton)
 
 	return self
 end
 
-function Automaton.destroy(self: Automaton): ()
-	self.stateChanged:destroy()
-end
-
 function Automaton.change(self: Automaton, target: string): ()
-	local source = self.state
 	local statesMap = self._statesMap
+	local source = self.state
 
 	local sourceState = statesMap[source] :: state
 	local targetState = statesMap[target]
@@ -107,12 +100,14 @@ function Automaton.change(self: Automaton, target: string): ()
 	if enter then
 		enter()
 	end
+
 	self.state = target
 	self.stateChanged:fire(target, source)
 end
 
 function Automaton.trigger(self: Automaton, trigger: string, ...: any): ()
-	local transitions = self._transitionsMap[trigger]
+	local transitionsMap = self._transitionsMap
+	local transitions = transitionsMap[trigger]
 	if not transitions then
 		return
 	end
@@ -128,14 +123,16 @@ function Automaton.trigger(self: Automaton, trigger: string, ...: any): ()
 			continue
 		end
 
-		local target = transition.target
-		self:change(target)
+		self:change(transition.target)
+
 		break
 	end
 end
 
 function Automaton.invoke(self: Automaton, action: string, ...: any): ...any
-	local state = self._statesMap[self.state] :: state
+	local statesMap = self._statesMap
+	local state = statesMap[self.state] :: state
+
 	local callback = state[action]
 	if callback then
 		return callback(...)

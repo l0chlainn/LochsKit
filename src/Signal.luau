@@ -8,7 +8,7 @@ type Connection = Connection.Connection
 type callback = (...any) -> ()
 
 -- Cache a caller to avoid thread creation overhead.
-local idleCaller: thread? = nil
+local idleCaller = nil :: thread?
 
 local function call(callback: callback, ...: any): ()
 	local busyCaller = idleCaller :: thread
@@ -24,21 +24,14 @@ local function caller(): ()
 end
 
 local function spawner(connection: Connection?, ...: any): ()
-	-- It's possible for a disconnect to occur in a thread, destroying our navigation.
-	-- By cacheing our connections first, we avoid this navigation issue.
-	local connections = {}
 	while connection do
-		table.insert(connections, connection)
-		connection = connection._nextConnection
-	end
-
-	for _, conn in connections do
-		if conn.isConnected then
+		if connection.isConnected then
 			if not idleCaller then
 				idleCaller = task.spawn(caller)
 			end
-			task.spawn(idleCaller :: thread, conn._callback, ...)
+			task.spawn(idleCaller :: thread, connection._callback, ...)
 		end
+		connection = connection._nextConnection
 	end
 end
 
@@ -64,12 +57,22 @@ local function createSignal(): Signal
 	return self
 end
 
-function Signal.destroy(self: Signal): ()
-	self:disconnectAll()
+function Signal.disconnect(self: Signal): ()
+	local currentConnection = self._headConnection
+	while currentConnection do
+		currentConnection.isConnected = false
+
+		local nextConnection = currentConnection._nextConnection
+		currentConnection._nextConnection = nil
+		currentConnection._previousConnection = nil
+
+		currentConnection = nextConnection
+	end
 end
 
 function Signal.connect(self: Signal, callback: callback): Connection
 	local newConnection = Connection.new(self :: any, callback)
+
 	local headConnection = self._headConnection
 	if headConnection then
 		newConnection._nextConnection = headConnection
@@ -80,27 +83,10 @@ function Signal.connect(self: Signal, callback: callback): Connection
 	return newConnection
 end
 
-function Signal.disconnectAll(self: Signal): ()
-	local connection = self._headConnection
-	while connection do
-		connection.isConnected = false
-
-		connection._signal = nil
-		connection._callback = nil
-
-		local nextConnection = connection._nextConnection
-		connection._nextConnection = nil
-		connection._previousConnection = nil
-
-		connection = nextConnection
-	end
-	self._headConnection = nil
-end
-
 function Signal.fire(self: Signal, ...: any): ()
-	local connection = self._headConnection
-	if connection then
-		task.defer(spawner, connection, ...)
+	local headConnection = self._headConnection
+	if headConnection then
+		task.defer(spawner, headConnection, ...)
 	end
 end
 
